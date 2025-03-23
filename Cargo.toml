@@ -11,5 +11,15 @@ tokio = { version = "1", features = ["time"] }
 futures-core = "0.3"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "test-util"] }
+tokio = { version = "1", features = ["full", "test-util"] }
+tokio-util = { version = "0.7.14", features = ["time"] }
 futures-util = "0.3"
+criterion = { version = "0.5", features = ["async_tokio"] }
+rand = "0.8"
+
+[[bench]]
+name = "comparison"
+harness = false
+
+[profile.bench]
+debug = true
