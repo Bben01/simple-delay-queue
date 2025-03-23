@@ -2,8 +2,8 @@
 
 A lightweight and efficient time-based queue implementation for Tokio that delays yielding inserted elements until a fixed timeout has elapsed.
 
-[![Crates.io](https://img.shields.io/crates/v/simple-delay-queue.svg)](https://crates.io/crates/time_queue)
-[![Documentation](https://docs.rs/time_queue/badge.svg)](https://docs.rs/time_queue)
+[![Crates.io](https://img.shields.io/crates/v/simple-delay-queue.svg)](https://crates.io/crates/simple-delay-queue)
+[![Documentation](https://docs.rs/simple-delay-queue/badge.svg)](https://docs.rs/simple-delay-queue)
 
 ## Overview
 
