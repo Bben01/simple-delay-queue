@@ -1,0 +1,12 @@
+[package]
+name = "simple-delay-queue"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.44.1", features = ["time"] }
+futures-core = "0.3.31"
+
+[dev-dependencies]
+tokio = { version = "1.44.1", features = ["macros", "test-util"] }
+futures-util = "0.3.31"
