@@ -2,6 +2,7 @@
 name = "simple-delay-queue"
 version = "0.1.0"
 edition = "2024"
+description = "A simple delay queue for Tokio"
 keywords = ["delay", "queue", "tokio"]
 license = "MIT OR Apache-2.0"
 
