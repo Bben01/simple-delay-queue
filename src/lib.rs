@@ -17,14 +17,13 @@
 //!   order. `DelayQueue` does not guarantee FIFO order if elements have different timeouts.
 //! - **Performance**: `TimeQueue` is optimized for performance with O(1) push and pop operations,
 //!   making it faster for use cases where the additional features of `DelayQueue` are not required.
+use futures_core::Stream;
 use std::{
     collections::VecDeque,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
-
-use futures_core::Stream;
 use tokio::time::{sleep_until, Instant, Sleep};
 
 /// A time queue that delays yielding inserted elements until a fixed timeout
@@ -39,17 +38,13 @@ pub struct TimeQueue<T> {
     queue: VecDeque<(Instant, T)>,
     /// The currently active timer to wake up the task when the next element expires.
     /// The sleep future is stored pinned manually.
-    timer: Option<Pin<Box<Sleep>>>,
+    timer: Pin<Box<Sleep>>,
 }
 
 impl<T> TimeQueue<T> {
     /// Creates a new `TimeQueue` with the given timeout.
     pub fn new(timeout: Duration) -> Self {
-        Self {
-            timeout,
-            queue: VecDeque::new(),
-            timer: None,
-        }
+        Self::with_capacity(timeout, 0)
     }
 
     /// Creates a new `TimeQueue` with the given timeout and reserves capacity for the underlying queue.
@@ -57,7 +52,7 @@ impl<T> TimeQueue<T> {
         Self {
             timeout,
             queue: VecDeque::with_capacity(capacity),
-            timer: None,
+            timer: Box::pin(sleep_until(Instant::now() + timeout)),
         }
     }
 
@@ -67,11 +62,6 @@ impl<T> TimeQueue<T> {
         // Compute the expiration time based on Tokio's clock.
         let expire_time = Instant::now() + self.timeout;
         self.queue.push_back((expire_time, element));
-
-        // If there is no timer active, set one.
-        if self.timer.is_none() {
-            self.set_timer();
-        }
     }
 
     #[inline(always)]
@@ -83,54 +73,32 @@ impl<T> TimeQueue<T> {
     pub fn len(&self) -> usize {
         self.queue.len()
     }
-
-    /// Sets (or resets) the timer to fire at the expiration time of the element
-    /// at the front of the queue.
-    fn set_timer(&mut self) {
-        if let Some(&(instant, _)) = self.queue.front() {
-            // Create a new sleep future and pin it manually.
-            self.timer = Some(Box::pin(sleep_until(instant)));
-        }
-    }
 }
 
 impl<T> Stream for TimeQueue<T> {
     type Item = T;
 
-    /// Polls the stream to yield the next element whose timeout has expired.
-    ///
-    /// If no element is ready, this method registers the current task to be
-    /// woken when the next element's timeout is reached.
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // If the queue is empty, clear any timer and return Pending.
-        if self.queue.is_empty() {
-            self.timer = None;
+        // Early return if the queue is empty.
+        let Some(&(expiration, _)) = self.queue.front() else {
             return Poll::Pending;
+        };
+
+        // If the expiration time has passed, return the element immediately.
+        if expiration <= Instant::now() {
+            return Poll::Ready(self.queue.pop_front().map(|(_, elem)| elem));
         }
 
-        // Ensure there is an active timer.
-        if self.timer.is_none() {
-            self.set_timer();
+        // Ensure a timer is scheduled for the front element.
+        if self.timer.deadline() < expiration {
+            self.timer.as_mut().reset(expiration);
         }
 
-        // Now, we have a timer. It is stored as a Pin<Box<Sleep>>,
-        // so we can poll it using its pinned projection.
-        let timer = self.timer.as_mut().expect("timer should be set");
-        if timer.as_mut().poll(cx).is_pending() {
-            return Poll::Pending;
-        }
+        // Poll the timer using the ready! macro.
+        let _ = ready!(self.timer.as_mut().poll(cx));
 
-        // Timer has fired; remove the expired element from the front.
-        let (_instant, element) = self.queue.pop_front().expect("queue was non-empty");
-
-        // Reset the timer for the next element if any remain.
-        if !self.queue.is_empty() {
-            self.set_timer();
-        } else {
-            self.timer = None;
-        }
-
-        Poll::Ready(Some(element))
+        // Timer expired, so pop and return the element.
+        Poll::Ready(self.queue.pop_front().map(|(_, elem)| elem))
     }
 }
 
