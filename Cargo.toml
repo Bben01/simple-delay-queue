@@ -1,15 +1,25 @@
 [package]
 name = "simple-delay-queue"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 description = "A simple delay queue for Tokio"
 keywords = ["delay", "queue", "tokio"]
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/Bben01/simple-delay-queue"
 
 [dependencies]
 tokio = { version = "1", features = ["time"] }
 futures-core = "0.3"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "test-util"] }
+tokio = { version = "1", features = ["full", "test-util"] }
+tokio-util = { version = "0.7.14", features = ["time"] }
 futures-util = "0.3"
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name = "comparison"
+harness = false
+
+[profile.bench]
+debug = true
